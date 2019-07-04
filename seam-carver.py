@@ -2,6 +2,7 @@ import sys
 
 import PIL
 import numpy as np
+from matplotlib import animation
 from matplotlib import image
 from matplotlib import pyplot
 
@@ -44,16 +45,27 @@ if __name__ == '__main__':
     print(data.dtype)
     print(data.shape)
 
-    pyplot.figure()
-    pyplot.subplot(2, 1, 1)
-    pyplot.imshow(data)
-
     np.pad(data, pad_width=1, mode='edge')
 
     energy = compute_energy(data)
-
     energy[energy < np.percentile(energy, _ENERGY_PERCENTILE)] = 0
     print(energy)
-    pyplot.subplot(2, 1, 2)
+
+    figure = pyplot.figure()
+
+    pyplot.subplot(2, 1, 1).axis('off')
     pyplot.imshow(energy)
+
+    pyplot.subplot(2, 1, 2).axis('off')
+    curr = pyplot.imshow(energy)
+
+    def animate(i):
+        # TODO(aryann): Use this function to run one iteration of the
+        # seam carving algorithm.
+        if i % 2 == 0:
+            curr.set_data(data)
+        else:
+            curr.set_data(energy)
+
+    _ = animation.FuncAnimation(figure, animate, interval=1000)
     pyplot.show()
