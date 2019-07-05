@@ -1,4 +1,6 @@
+import collections
 import logging
+import threading
 import sys
 
 import PIL
@@ -15,9 +17,18 @@ _RESIZE_FACTOR = .2
 # above this percentile are displayed as white.
 _ENERGY_PERCENTILE = 95
 
+_SEAM_COLOR = (255, 255, 255)
+
+
+Plots = collections.namedtuple(
+    'Plots',
+    ['energy', 'image_with_seam', 'cropped_image'])
+
 
 def compute_energy(data):
     """N.B.: energies for the edges are not computed."""
+    data = np.pad(data, pad_width=1, mode='edge')
+
     result = np.zeros(data.shape[:2], dtype=np.int32)
 
     for i in range(1, data.shape[0] - 1):
@@ -70,6 +81,63 @@ def compute_seam_costs(energy):
     return costs[:, 1:-1], indices[:, 1:-1]
 
 
+def get_min_seam_indices(costs, indices):
+    result = np.zeros(costs.shape[0], dtype=np.int32)
+    result[0] = costs[-1, :].argmin()
+    for i in range(1, result.size):
+        result[i] = indices[indices.shape[0] - i, result[0]]
+
+    return np.flip(result)
+
+
+def color_seam(image, seam_indices):
+    for i in range(image.shape[0]):
+        image[i, seam_indices[i]] = _SEAM_COLOR
+
+
+def remove_seam(image, seam_indices):
+    result = np.zeros((image.shape[0], image.shape[1] - 1, image.shape[2]),
+                      dtype=np.int64)
+    for i in range(image.shape[0]):
+        result[i] = np.concatenate((image[i, :seam_indices[i], :],
+                                    image[i, seam_indices[i] + 1:, :]))
+    return result
+
+
+def run_iteration(data, plots):
+    logging.info('Starting iteration.')
+    logging.info('Image shape: %s', data.shape)
+
+    energy = compute_energy(data)
+    logging.debug('Finished computing image energy:\n%s', energy)
+    logging.debug('Energy shape: %s', energy.shape)
+
+    # TODO(aryann): Figure out how to instruct matplotlib to reset the
+    # colors it assigns to the plot since the space the energy plot
+    # operates in is very different from that of the original image.
+    plots.energy.set_data(energy)
+
+    costs, indices = compute_seam_costs(energy)
+    logging.debug('Finished computing seam costs and indices:\n%s\n\n%s',
+                  costs, indices)
+
+    min_seam_indices = get_min_seam_indices(costs, indices)
+    logging.debug('Min seam indices:\n%s', min_seam_indices)
+
+    color_seam(data, min_seam_indices)
+    plots.image_with_seam.set_data(data)
+
+    data = remove_seam(data, min_seam_indices)
+    plots.cropped_image.set_data(data)
+    logging.info('Done with iteration..')
+    return data
+
+
+def run(data, plots):
+    while True:
+        data = run_iteration(data, plots)
+
+
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
     image_obj = PIL.Image.open(sys.argv[1])
@@ -77,30 +145,29 @@ if __name__ == '__main__':
                          image_obj.size[1] * _RESIZE_FACTOR))
 
     data = np.array(image_obj)
-    logging.info('Image shape: %s', data.shape)
-
-    np.pad(data, pad_width=1, mode='edge')
-
-    energy = compute_energy(data)
-    logging.info('Finished computing image energy: %s', energy)
-    logging.info('Finished computing seam costs: %s', compute_seam_costs(energy))
-    energy[energy < np.percentile(energy, _ENERGY_PERCENTILE)] = 0
 
     figure = pyplot.figure()
 
-    pyplot.subplot(2, 1, 1).axis('off')
-    pyplot.imshow(energy)
+    pyplot.subplot(2, 2, 1).axis('off')
+    energy_plot = pyplot.imshow(data)
 
-    pyplot.subplot(2, 1, 2).axis('off')
-    curr = pyplot.imshow(energy)
+    pyplot.subplot(2, 2, 2).axis('off')
+    pyplot.imshow(data)
 
-    def animate(i):
-        # TODO(aryann): Use this function to run one iteration of the
-        # seam carving algorithm.
-        if i % 2 == 0:
-            curr.set_data(data)
-        else:
-            curr.set_data(energy)
+    pyplot.subplot(2, 2, 3).axis('off')
+    image_with_seam_plot = pyplot.imshow(data)
 
-    _ = animation.FuncAnimation(figure, animate, interval=1000)
+    pyplot.subplot(2, 2, 4).axis('off')
+    cropped_image_plot = pyplot.imshow(data)
+
+    plots = Plots(
+        energy=energy_plot,
+        image_with_seam=image_with_seam_plot,
+        cropped_image=cropped_image_plot)
+    threading.Thread(target=run, args=(data, plots)).start()
+
+    def animate(i, plots):
+        pass
+
+    _ = animation.FuncAnimation(figure, animate, fargs=(plots,), interval=100)
     pyplot.show()
