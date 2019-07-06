@@ -90,23 +90,32 @@ def get_min_seam_indices(costs, indices):
     return np.flip(result)
 
 
-def color_seam(image, seam_indices):
-    for i in range(image.shape[0]):
-        image[i, seam_indices[i]] = _SEAM_COLOR
-
-
 def remove_seam(image, seam_indices):
     result = np.zeros((image.shape[0], image.shape[1] - 1, image.shape[2]),
                       dtype=np.int64)
     for i in range(image.shape[0]):
         result[i] = np.concatenate((image[i, :seam_indices[i], :],
-                                    image[i, seam_indices[i] + 1:, :]))
+                                   image[i, seam_indices[i] + 1:, :]))
     return result
 
 
-def run_iteration(data, plots):
-    logging.info('Starting iteration.')
-    logging.info('Image shape: %s', data.shape)
+def color_seam(data, seam_indices):
+    result = data.copy()
+    for i in range(data.shape[0]):
+        result[i, seam_indices[i]] = _SEAM_COLOR
+    return result
+
+
+def add_border_for_rendering(data, width):
+    return np.concatenate((
+        data,
+        np.ones(shape=(
+            data.shape[0], width, data.shape[2]), dtype=np.int64) * (255, 0, 0)),
+                          axis=1)
+
+
+def run_iteration(data, plots, num_iterations):
+    logging.info('Starting iteration %d.', num_iterations)
 
     energy = compute_energy(data)
     logging.debug('Finished computing image energy:\n%s', energy)
@@ -120,18 +129,19 @@ def run_iteration(data, plots):
     min_seam_indices = get_min_seam_indices(costs, indices)
     logging.debug('Min seam indices:\n%s', min_seam_indices)
 
-    color_seam(data, min_seam_indices)
-    plots.image_with_seam.set_data(data)
+    plots.image_with_seam.set_data(color_seam(data, min_seam_indices))
 
     data = remove_seam(data, min_seam_indices)
-    plots.cropped_image.set_data(data)
+    plots.cropped_image.set_data(add_border_for_rendering(data, num_iterations))
     logging.info('Done with iteration..')
     return data
 
 
 def run(data, plots):
+    num_iterations = 0
     while True:
-        data = run_iteration(data, plots)
+        num_iterations += 1
+        data = run_iteration(data, plots, num_iterations)
 
 
 if __name__ == '__main__':
