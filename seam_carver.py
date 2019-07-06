@@ -111,10 +111,6 @@ def run_iteration(data, plots):
     energy = compute_energy(data)
     logging.debug('Finished computing image energy:\n%s', energy)
     logging.debug('Energy shape: %s', energy.shape)
-
-    # TODO(aryann): Figure out how to instruct matplotlib to reset the
-    # colors it assigns to the plot since the space the energy plot
-    # operates in is very different from that of the original image.
     plots.energy.set_data(energy)
 
     costs, indices = compute_seam_costs(energy)
@@ -148,22 +144,31 @@ if __name__ == '__main__':
 
     figure = pyplot.figure()
 
-    pyplot.subplot(2, 2, 1).axis('off')
-    energy_plot = pyplot.imshow(data)
+    energy_plot = pyplot.subplot(2, 2, 1)
+    energy_plot.set_title('energy')
+    energy_plot.axis('off')
+    energy_image = pyplot.imshow(data)
+    energy_image.set_clim(vmin=0, vmax=6 * ((1 << 8) - 1) ** 2)
 
-    pyplot.subplot(2, 2, 2).axis('off')
+    original_image_plot = pyplot.subplot(2, 2, 2)
+    original_image_plot.set_title('original')
+    original_image_plot.axis('off')
     pyplot.imshow(data)
 
-    pyplot.subplot(2, 2, 3).axis('off')
-    image_with_seam_plot = pyplot.imshow(data)
+    image_with_seam_plot = pyplot.subplot(2, 2, 3)
+    image_with_seam_plot.set_title('current seam')
+    image_with_seam_plot.axis('off')
+    image_with_seam = pyplot.imshow(data)
 
-    pyplot.subplot(2, 2, 4).axis('off')
-    cropped_image_plot = pyplot.imshow(data)
+    cropped_image_plot = pyplot.subplot(2, 2, 4)
+    cropped_image_plot.set_title('cropped image')
+    cropped_image_plot.axis('off')
+    cropped_image = pyplot.imshow(data)
 
     plots = Plots(
-        energy=energy_plot,
-        image_with_seam=image_with_seam_plot,
-        cropped_image=cropped_image_plot)
+        energy=energy_image,
+        image_with_seam=image_with_seam,
+        cropped_image=cropped_image)
     threading.Thread(target=run, args=(data, plots)).start()
 
     def animate(i, plots):
