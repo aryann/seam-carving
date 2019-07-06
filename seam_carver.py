@@ -68,9 +68,8 @@ def compute_seam_costs(energy):
                     dtype=np.int64)
     indices = np.zeros(costs.shape, dtype=np.int32)
 
-    for j in range(1, costs.shape[1] - 1):
-        costs[0, j] = energy[0, j - 1]
-        indices[0, j] = -1
+    costs[0, 1 : costs.shape[1] - 1] = energy[0, :]
+    indices[0, :] = -1
 
     for i in range(1, costs.shape[0]):
         for j in range(1, costs.shape[1] - 1):
