@@ -1,6 +1,4 @@
-import collections
 import logging
-import threading
 import sys
 
 import PIL
@@ -11,18 +9,6 @@ from matplotlib import pyplot
 
 
 _RESIZE_FACTOR = .2
-
-# Determines while energy levels are visualized. Any cell value that
-# is below this percentile is displayed as black. Cell values at or
-# above this percentile are displayed as white.
-_ENERGY_PERCENTILE = 95
-
-_SEAM_COLOR = (255, 255, 255)
-
-
-Plots = collections.namedtuple(
-    'Plots',
-    ['energy', 'image_with_seam', 'cropped_image'])
 
 
 def compute_energy(data):
@@ -98,13 +84,6 @@ def remove_seam(image, seam_indices):
     return result
 
 
-def color_seam(data, seam_indices):
-    result = data.copy()
-    for i in range(data.shape[0]):
-        result[i, seam_indices[i]] = _SEAM_COLOR
-    return result
-
-
 def add_border_for_rendering(data, width):
     return np.concatenate((
         data,
@@ -113,75 +92,45 @@ def add_border_for_rendering(data, width):
                           axis=1)
 
 
-def run_iteration(data, plots, num_iterations):
-    logging.info('Starting iteration %d.', num_iterations)
-
-    energy = compute_energy(data)
-    logging.debug('Finished computing image energy:\n%s', energy)
-    logging.debug('Energy shape: %s', energy.shape)
-    plots.energy.set_data(energy)
-
-    costs, indices = compute_seam_costs(energy)
-    logging.debug('Finished computing seam costs and indices:\n%s\n\n%s',
-                  costs, indices)
-
-    min_seam_indices = get_min_seam_indices(costs, indices)
-    logging.debug('Min seam indices:\n%s', min_seam_indices)
-
-    plots.image_with_seam.set_data(color_seam(data, min_seam_indices))
-
-    data = remove_seam(data, min_seam_indices)
-    plots.cropped_image.set_data(add_border_for_rendering(data, num_iterations))
-    logging.info('Done with iteration..')
-    return data
-
-
-def run(data, plots):
-    num_iterations = 0
-    while True:
-        num_iterations += 1
-        data = run_iteration(data, plots, num_iterations)
-
-
 if __name__ == '__main__':
+    filepath = sys.argv[1]
+    num_iterations = int(sys.argv[2])
+
     logging.getLogger().setLevel(logging.INFO)
     image_obj = PIL.Image.open(sys.argv[1])
     image_obj.thumbnail((image_obj.size[0] * _RESIZE_FACTOR,
                          image_obj.size[1] * _RESIZE_FACTOR))
 
+    figure = pyplot.figure()
     data = np.array(image_obj)
 
-    figure = pyplot.figure()
-
-    energy_plot = pyplot.subplot(2, 2, 1)
-    energy_plot.set_title('energy')
-    energy_plot.axis('off')
-    energy_image = pyplot.imshow(data)
-    energy_image.set_clim(vmin=0, vmax=6 * ((1 << 8) - 1) ** 2)
-
-    original_image_plot = pyplot.subplot(2, 2, 2)
-    original_image_plot.set_title('original')
-    original_image_plot.axis('off')
+    original_plot= pyplot.subplot(2, 2, 1)
+    original_plot.set_title('original')
+    original_plot.axis('off')
     pyplot.imshow(data)
 
-    image_with_seam_plot = pyplot.subplot(2, 2, 3)
-    image_with_seam_plot.set_title('current seam')
-    image_with_seam_plot.axis('off')
-    image_with_seam = pyplot.imshow(data)
+    energy = compute_energy(data)
+    energy_plot = pyplot.subplot(2, 2, 2)
+    energy_plot.set_title('energy')
+    energy_plot.axis('off')
+    pyplot.imshow(energy)
 
-    cropped_image_plot = pyplot.subplot(2, 2, 4)
-    cropped_image_plot.set_title('cropped image')
-    cropped_image_plot.axis('off')
-    cropped_image = pyplot.imshow(data)
+    costs, indices = compute_seam_costs(energy)
+    costs_plot = pyplot.subplot(2, 2, 4)
+    costs_plot.set_title('seam costs')
+    costs_plot.axis('off')
+    pyplot.imshow(costs)
 
-    plots = Plots(
-        energy=energy_image,
-        image_with_seam=image_with_seam,
-        cropped_image=cropped_image)
-    threading.Thread(target=run, args=(data, plots)).start()
+    for i in range(num_iterations):
+        logging.info('Iteration: %d', i)
+        min_seam_indices = get_min_seam_indices(costs, indices)
+        data = remove_seam(data, min_seam_indices)
+        energy = compute_energy(data)
+        costs, indices = compute_seam_costs(energy)
 
-    def animate(i, plots):
-        pass
+    shrunk_plot = pyplot.subplot(2, 2, 3)
+    shrunk_plot.set_title('shrunk')
+    shrunk_plot.axis('off')
+    pyplot.imshow(add_border_for_rendering(data, num_iterations))
 
-    _ = animation.FuncAnimation(figure, animate, fargs=(plots,), interval=100)
     pyplot.show()
