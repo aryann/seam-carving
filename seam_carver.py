@@ -4,8 +4,6 @@ import sys
 
 import PIL
 import numpy as np
-from matplotlib import animation
-from matplotlib import image
 from matplotlib import pyplot
 
 
