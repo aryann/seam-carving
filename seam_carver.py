@@ -16,7 +16,7 @@ def compute_energy(data):
     """N.B.: energies for the edges are not computed."""
     data = np.pad(data, pad_width=1, mode='edge')
 
-    result = np.zeros(data.shape[:2], dtype=np.int32)
+    result = np.empty(data.shape[:2], dtype=np.int32)
 
     for i in range(1, data.shape[0] - 1):
         for j in range(1, data.shape[1] - 1):
@@ -53,7 +53,7 @@ def compute_seam_costs(energy):
     costs = np.full((energy.shape[0], energy.shape[1] + 2),
                     fill_value=np.iinfo(np.int64).max,
                     dtype=np.int64)
-    indices = np.zeros(costs.shape, dtype=np.int32)
+    indices = np.empty(costs.shape, dtype=np.int32)
 
     costs[0, 1 : costs.shape[1] - 1] = energy[0, :]
     indices[0, :] = -1
@@ -68,7 +68,7 @@ def compute_seam_costs(energy):
 
 
 def get_min_seam_indices(costs, indices):
-    result = np.zeros(costs.shape[0], dtype=np.int32)
+    result = np.empty(costs.shape[0], dtype=np.int32)
     result[0] = costs[-1, :].argmin()
     for i in range(1, result.size):
         result[i] = indices[indices.shape[0] - i, result[0]]
@@ -77,7 +77,7 @@ def get_min_seam_indices(costs, indices):
 
 
 def remove_seam(image, seam_indices):
-    result = np.zeros((image.shape[0], image.shape[1] - 1, image.shape[2]),
+    result = np.empty((image.shape[0], image.shape[1] - 1, image.shape[2]),
                       dtype=np.int64)
     for i in range(image.shape[0]):
         result[i] = np.concatenate((image[i, :seam_indices[i], :],
