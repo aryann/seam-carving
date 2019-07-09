@@ -1,4 +1,5 @@
 import logging
+import math
 import sys
 
 import PIL
@@ -29,7 +30,7 @@ def compute_energy(data):
             vertical = sum((int(top) - int(bottom)) ** 2 for top, bottom
                            in zip(top_rgb, bottom_rgb))
 
-            result[i, j] = horizontal + vertical
+            result[i, j] = math.sqrt(horizontal + vertical)
 
     return result[1:-1, 1:-1]
 
