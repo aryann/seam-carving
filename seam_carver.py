@@ -1,3 +1,4 @@
+"""Usage: python3 seam_carver.py ${PATH_TO_IMAGE?} ${NUM_ITERATIONS?}"""
 import logging
 import math
 import sys
